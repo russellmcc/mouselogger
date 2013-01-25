@@ -111,7 +111,7 @@ class MouseLoggerApp : public AppCocoaTouch, public TouchProvider {
     shared_ptr<TouchLogReader> mReader;
     double mPlaybackStartTime;
     shared_ptr<MouseTouchDrawer> mDrawer;
-    stringstream mLog;
+    shared_ptr<stringstream> mLog;
 };
 
 void MouseLoggerApp::setup()
@@ -124,12 +124,12 @@ void MouseLoggerApp::setup()
 
 void MouseLoggerApp::startLogPlayback()
 {
-    //reset the log.
-    mLog.clear();
-    mLog.seekg(0);
+    //reset the log to the beginning
+    mLog->clear();
+    mLog->seekg(0);
     mPlaybackStartTime = getElapsedSeconds();
     mDrawer.reset(new MouseTouchDrawer());
-    mReader = TouchLogReader::create(mLog);
+    mReader = TouchLogReader::create(*mLog);
     mReader->addListener(*mDrawer);
 }
 
@@ -166,11 +166,10 @@ void MouseLoggerApp::toggleLog()
         startLogPlayback();
     }
     else {
-        mReader.reset();    
-        mLog.clear();
-        mLog.seekp(0);
+        mReader.reset();
+        mLog.reset(new stringstream());
         mDrawer.reset(new MouseTouchDrawer());
-        mLogger = TouchLogger::create(mLog);
+        mLogger = TouchLogger::create(*mLog);
         addListener(*mLogger);
         addListener(*mDrawer);
     }
