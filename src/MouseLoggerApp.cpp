@@ -5,7 +5,9 @@
 #include "TouchLogger.h"
 
 #include <cmath>
-#include <sstream>
+#include <fstream>
+
+#import <UIKit/UIKit.h>
 
 using namespace ci;
 using namespace ci::app;
@@ -20,7 +22,7 @@ namespace
 }
 
 // this class taken from the cinder example.
-class MouseTouchDrawer : public TouchLogReader::Listener
+class MouseTouchDrawer : public TouchListener
 {
     struct TouchPoint {
         TouchPoint() {}
@@ -88,7 +90,7 @@ class MouseTouchDrawer : public TouchLogReader::Listener
 
 };
 
-class MouseLoggerApp : public AppCocoaTouch {
+class MouseLoggerApp : public AppCocoaTouch, public TouchProvider {
   public:
 	virtual void	setup();
 	virtual void	update();
@@ -105,7 +107,6 @@ class MouseLoggerApp : public AppCocoaTouch {
     
     void startLogPlayback();
 
-    TouchList mCurrTouches;
     shared_ptr<TouchLogger> mLogger;
     shared_ptr<TouchLogReader> mReader;
     double mPlaybackStartTime;
@@ -117,6 +118,8 @@ void MouseLoggerApp::setup()
 {
     mChanged = false;
     mLogger.reset();
+    mDrawer.reset(new MouseTouchDrawer());
+    addListener(*mDrawer);
 }
 
 void MouseLoggerApp::startLogPlayback()
@@ -127,14 +130,12 @@ void MouseLoggerApp::startLogPlayback()
     mPlaybackStartTime = getElapsedSeconds();
     mDrawer.reset(new MouseTouchDrawer());
     mReader = TouchLogReader::create(mLog);
-    mReader->addListener(*mDrawer.get());
+    mReader->addListener(*mDrawer);
 }
 
 void MouseLoggerApp::update()
 {
-    if(mLogger)
-        mLogger->LogFrame(mCurrTouches);
-    else if(mReader)
+    if(mReader)
     {
         double playbackTime = getElapsedSeconds() - mPlaybackStartTime;
         mReader->readUntil(playbackTime);
@@ -147,18 +148,14 @@ void MouseLoggerApp::update()
 void MouseLoggerApp::touchesBegan( TouchEvent event )
 {
     for(const TouchEvent::Touch& t : event.getTouches()) {
-        mCurrTouches[t.getId()] = t.getPos();
-        if(mDrawer and mLogger)
-            mDrawer->touchBegan(t.getId(), t.getPos());
+        mTouchBegan->call(t.getId(), t.getPos());
     }
 }
 
 void MouseLoggerApp::touchesMoved( TouchEvent event )
 {
     for(const TouchEvent::Touch& t : event.getTouches()) {
-        mCurrTouches[t.getId()] = t.getPos();
-        if(mDrawer and mLogger)
-            mDrawer->touchMoved(t.getId(), t.getPos());
+        mTouchMoved->call(t.getId(), t.getPos());
     }
 }
 
@@ -170,19 +167,18 @@ void MouseLoggerApp::toggleLog()
     }
     else {
         mLog.clear();
-        mLog.str("");
+        mLog.seekp(0);
         mDrawer.reset(new MouseTouchDrawer());
         mLogger = TouchLogger::create(mLog);
+        addListener(*mLogger);
+        addListener(*mDrawer);
     }
 }
 
 void MouseLoggerApp::touchesEnded( TouchEvent event )
 {
     for(const TouchEvent::Touch& t : event.getTouches()) {
-        mCurrTouches.erase(t.getId());
-        
-        if(mDrawer and mLogger)
-            mDrawer->touchEnded(t.getId(), t.getPos());
+        mTouchEnded->call(t.getId(), t.getPos());
         
         if(t.getPos().distanceSquared(kRecordButtonPos) < kRecordButtonRadius*kRecordButtonRadius)
             toggleLog();

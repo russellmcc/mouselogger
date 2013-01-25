@@ -26,7 +26,7 @@
 
 /* Begin PBXFileReference section */
 		00CFDF6A1138442D0091E310 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
-		00CFDFDF11384CC60091E310 /* MouseLoggerApp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = MouseLoggerApp.cpp; path = ../src/MouseLoggerApp.cpp; sourceTree = "<group>"; };
+		00CFDFDF11384CC60091E310 /* MouseLoggerApp.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.objcpp; fileEncoding = 4; name = MouseLoggerApp.cpp; path = ../src/MouseLoggerApp.cpp; sourceTree = "<group>"; };
 		00EB53EF13E250DA006BF8E7 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		00EB53F113E251EF006BF8E7 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../assets; sourceTree = "<group>"; };
 		00EB543E13E25352006BF8E7 /* CoreText.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreText.framework; path = System/Library/Frameworks/CoreText.framework; sourceTree = SDKROOT; };

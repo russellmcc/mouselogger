@@ -26,6 +26,8 @@ namespace {
     const string kMovedTag = "moved";
 }
 
+
+
 class TouchEventLogger : public TouchLogger
 {
   public:
@@ -33,40 +35,39 @@ class TouchEventLogger : public TouchLogger
       mStream(stream)
     {}
     
-    virtual void LogFrame(const TouchList& currTouches) override
+    virtual void	touchBegan( uint32_t id, ci::Vec2f pos )
     {
-        // detect any changes since the last log.
-        stringstream changes("");    
-        for(const pair<uint32_t, Vec2f>& t : currTouches) {
-            if(mLastLoggedList.find(t.first) == mLastLoggedList.end())
-                changes<<","<<kAddedTag<<","<<t.first<<","<<t.second.x<<","<<t.second.y;
-            else if(mLastLoggedList[t.first] != t.second)
-                changes<<","<<kMovedTag<<","<<t.first<<","<<t.second.x<<","<<t.second.y;
-        }
-        
-        for(const pair<uint32_t, Vec2f>& t : mLastLoggedList) {
-            if(currTouches.find(t.first) == currTouches.end())
-                changes<<","<<kEndedTag<<","<<t.first<<","<<t.second.x<<","<<t.second.y;
-        }
-        
+        writeTouchEvent(kAddedTag, id, pos);
+    }
+    virtual void	touchMoved( uint32_t id, ci::Vec2f pos )
+    {
+        writeTouchEvent(kMovedTag, id, pos);
+    }
+    virtual void	touchEnded( uint32_t id, ci::Vec2f pos )
+    {
+        writeTouchEvent(kEndedTag, id, pos);
+    }
+    
+  private:
+    double getCurrTime() {
         // figure out what time it is.
         double currTime = mTimeZero ?
                             getElapsedSeconds() - *mTimeZero :
                             0;
         
-        if(not mTimeZero) mTimeZero = getElapsedSeconds();        
-        
-        // if there were changes, write them out.
-        if(changes.str().length())
-        {
-            mStream<<currTime<<changes.str()<<endl;
-        }
-        
-        mLastLoggedList = currTouches;
+        if(not mTimeZero) mTimeZero = getElapsedSeconds();
+        return currTime;
     }
     
-  private:
-    TouchList mLastLoggedList;
+    void writeTouchEvent(string tag, uint32_t id, Vec2f pos)
+    {
+        mStream<<getCurrTime()<<","<<
+                 tag<<","<<
+                 id<<","<<
+                 pos.x<<","<<
+                 pos.y<<","<<endl;
+    }
+
     ostream& mStream;
     optional<double> mTimeZero;
 };
@@ -94,38 +95,35 @@ class TouchEventLogReader : public TouchLogReader
             boost::tokenizer<boost::char_separator<char> > tok(mCurrLine, sep);
             boost::tokenizer<boost::char_separator<char> >::iterator curr = tok.begin();
             ++curr; // skip the time token
-            while(curr != tok.end())
+            try {
+                string tag = *curr;
+                uint32_t id = boost::lexical_cast<uint32_t>(*(++curr));
+                Vec2f v;
+                v.x = boost::lexical_cast<double>(*(++curr));
+                v.y = boost::lexical_cast<double>(*(++curr));
+                if(tag == kAddedTag) {
+                    mTouchBegan->call(id, v);
+                    mCurrentState[id] = v;
+                } else if (tag == kMovedTag) {
+                    mTouchMoved->call(id, v);
+                    mCurrentState[id] = v;
+                } else if (tag == kEndedTag) {
+                    mTouchEnded->call(id, v);
+                    mCurrentState.erase(id);
+                } else {
+                    console() << "Parsing error! - unknown tag " << tag;
+                }
+                ++curr;
+            }
+            catch(...)
             {
-                try {
-                    string tag = *curr;
-                    uint32_t id = boost::lexical_cast<uint32_t>(*(++curr));
-                    Vec2f v;
-                    v.x = boost::lexical_cast<double>(*(++curr));
-                    v.y = boost::lexical_cast<double>(*(++curr));
-                    if(tag == kAddedTag) {
-                        mTouchBegan->call(id, v);
-                        mCurrentState[id] = v;
-                    } else if (tag == kMovedTag) {
-                        mTouchMoved->call(id, v);
-                        mCurrentState[id] = v;
-                    } else if (tag == kEndedTag) {
-                        mTouchEnded->call(id, v);
-                        mCurrentState.erase(id);
-                    } else {
-                        console() << "Parsing error! - unknown tag " << tag;
-                    }
-                    ++curr;
-                }
-                catch(...)
-                {
-                    console() << "Parsing error!";
-                }
+                console() << "Parsing error!";
             }
             nextLine();
         }
     }
     
-    virtual TouchList getCurrentState() override
+    virtual TouchList getCurrentState()
     {
         return mCurrentState;
     }
@@ -191,7 +189,7 @@ TouchLogReader::create(istream& logStream)
     );
 }
 
-TouchLogReader::TouchLogReader() :
+TouchProvider::TouchProvider() :
     mTouchBegan(new TouchSignal()),
     mTouchMoved(new TouchSignal()),
     mTouchEnded(new TouchSignal())
@@ -199,27 +197,27 @@ TouchLogReader::TouchLogReader() :
 }
 
 namespace {
-    bool SignalIsGone(pair<weak_ptr<TouchLogReader::TouchSignal>, CallbackId>& t){
+    bool SignalIsGone(pair<weak_ptr<TouchSignal>, CallbackId>& t){
         return not t.first.lock();
     }
 }
 
 // stupid glue function
-void TouchLogReader::addListener(TouchLogReader::Listener& l)
+void TouchProvider::addListener(TouchListener& l)
 {
     // delete all deleted listeners here so the connection list
     // doesn't balloon
     remove_if(l.fConnections.begin(), l.fConnections.end(), SignalIsGone);
     
     l.fConnections.push_back(make_pair(mTouchBegan,mTouchBegan->registerCb(
-        bind(&Listener::touchBegan, &l, _1, _2))));
+        bind(&TouchListener::touchBegan, &l, _1, _2))));
     l.fConnections.push_back(make_pair(mTouchMoved,mTouchMoved->registerCb(
-        bind(&Listener::touchMoved, &l, _1, _2))));
+        bind(&TouchListener::touchMoved, &l, _1, _2))));
     l.fConnections.push_back(make_pair(mTouchEnded,mTouchEnded->registerCb(
-        bind(&Listener::touchEnded, &l, _1, _2))));
+        bind(&TouchListener::touchEnded, &l, _1, _2))));
 }
 
-TouchLogReader::Listener::~Listener()
+TouchListener::~TouchListener()
 {
     for(const pair<weak_ptr<TouchSignal>, CallbackId>& connection : fConnections) {
         shared_ptr<TouchSignal> locked = connection.first.lock();
