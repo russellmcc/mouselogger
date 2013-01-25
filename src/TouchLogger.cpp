@@ -94,8 +94,16 @@ class TouchEventLogReader : public TouchLogReader
             boost::char_separator<char> sep(",");
             boost::tokenizer<boost::char_separator<char> > tok(mCurrLine, sep);
             boost::tokenizer<boost::char_separator<char> >::iterator curr = tok.begin();
-            ++curr; // skip the time token
+            
+            // skip blank lines
+            if(curr == tok.end())
+            {
+                nextLine();
+                continue;
+            }
+            
             try {
+                ++curr; // skip the time token
                 string tag = *curr;
                 uint32_t id = boost::lexical_cast<uint32_t>(*(++curr));
                 Vec2f v;
@@ -119,6 +127,7 @@ class TouchEventLogReader : public TouchLogReader
             {
                 console() << "Parsing error!";
             }
+
             nextLine();
         }
     }

@@ -166,6 +166,7 @@ void MouseLoggerApp::toggleLog()
         startLogPlayback();
     }
     else {
+        mReader.reset();    
         mLog.clear();
         mLog.seekp(0);
         mDrawer.reset(new MouseTouchDrawer());
