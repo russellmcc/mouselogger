@@ -111,15 +111,35 @@ class MouseLoggerApp : public AppCocoaTouch, public TouchProvider {
     shared_ptr<TouchLogReader> mReader;
     double mPlaybackStartTime;
     shared_ptr<MouseTouchDrawer> mDrawer;
-    shared_ptr<stringstream> mLog;
+    shared_ptr<fstream> mLog;
 };
+
+namespace {
+    const char* GetLogFile()
+    {
+        #if _MSC_VER
+            return "MouseLog.csv";
+        #else // iOS
+            NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+            NSString* documentsDirectory = [paths objectAtIndex:0];
+            NSString* file = [documentsDirectory stringByAppendingPathComponent:@"MouseLog.csv"];
+            return [file fileSystemRepresentation];
+        #endif
+    }
+}
 
 void MouseLoggerApp::setup()
 {
     mChanged = false;
     mLogger.reset();
     mDrawer.reset(new MouseTouchDrawer());
-    addListener(*mDrawer);
+
+    mLog.reset(new fstream());
+    mLog->open(GetLogFile(), ios::in);
+    if(mLog)
+        startLogPlayback();
+    else
+        addListener(*mDrawer);
 }
 
 void MouseLoggerApp::startLogPlayback()
@@ -161,13 +181,25 @@ void MouseLoggerApp::touchesMoved( TouchEvent event )
 
 void MouseLoggerApp::toggleLog()
 {
+
     if(mLogger) {
+        mLog.reset(new fstream());
+        mLog->open(GetLogFile(), ios::in);
+        if(not mLog)
+            console()<<"ERROR: couldn't open "<<GetLogFile()<<endl;
+        
         mLogger.reset();
         startLogPlayback();
     }
     else {
         mReader.reset();
-        mLog.reset(new stringstream());
+        
+        // can't open read/write on ios for some reason...
+        mLog.reset(new fstream());
+        mLog->open(GetLogFile(), ios::out);
+        if(not mLog)
+            console()<<"ERROR: couldn't open "<<GetLogFile()<<endl;
+            
         mDrawer.reset(new MouseTouchDrawer());
         mLogger = TouchLogger::create(*mLog);
         addListener(*mLogger);
